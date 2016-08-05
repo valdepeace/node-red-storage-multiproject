@@ -1,6 +1,6 @@
 {
   "name": "node-red-storage-nodesensor",
-  "version": "0.0.1-0",
+  "version": "0.0.1-1",
   "description": "conection node-sensor with node-red",
   "main": "index.js",
   "scripts": {
