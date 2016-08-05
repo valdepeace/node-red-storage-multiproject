@@ -1,0 +1,11 @@
+{
+  "name": "node-red-storage-nodesensor",
+  "version": "0.0.1-0",
+  "description": "conection node-sensor with node-red",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andres Carmona Gil",
+  "license": "ISC"
+}
