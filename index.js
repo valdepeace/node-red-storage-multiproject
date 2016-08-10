@@ -6,7 +6,7 @@ var MongoClient = require('mongodb').MongoClient
     , assert = require('assert');
 
 // Connection URL
-var url = 'mongodb://localhost:27017/sensortrack';
+var url = 'mongodb://localhost:27017/test';
 var fs = require('fs-extra');
 var when = require('when');
 var nodeFn = require('when/node/function');
@@ -118,6 +118,20 @@ var storage={
     init: function(_settings) {
         var promises = [];
         settings = _settings;
+        if (settings.mongodbMultiproject){
+            url = 'mongodb://'
+            if(settings.mongodbMultiproject.user){
+                url+=settings.mongodbMultiproject.user
+                url+=":"
+                url+=settings.mongodbMultiproject.user
+                url+="@"
+            }
+            url+=settings.mongodbMultiproject.host || "localhost"
+            url+=":"
+            url+=settings.mongodbMultiproject.port || "27017"
+            url+="/"
+            url+=settings.mongodbMultiproject.bd || "test"
+        }
         if (!settings.userDir) {
             try {
                 fs.statSync(fspath.join(process.env.NODE_RED_HOME,".config.json"));
@@ -392,6 +406,8 @@ var findFlows = function(db, callback) {
     // Get the documents collection
     var dbflows = db.collection('Flows');
     var projects = db.collection('Project');
+    if(settings.mongodbMultiproject.collectionProject)
+        projects=db.collection(settings.mongodbMultiproject.collectionProject);
     // Find some documents
     dbflows.find({}).toArray(function(err, flows) {
         if(err){
