@@ -196,7 +196,7 @@ var storage={
     },
 
     getFlows: function() {
-        return when.promise(function(resolve) {
+        return when.promise(function(resolve,reject) {
             if (!initialFlowLoadComplete) {
                 initialFlowLoadComplete = true;
                 //log.info(log._("storage.localfilesystem.user-dir",{path:settings.userDir}));
@@ -207,8 +207,9 @@ var storage={
                 assert.equal(null, err);
                 console.log("Connected correctly to server");
 
-                findFlows(db, function(flows) {
-
+                findFlows(db, function(err,flows) {
+                    if(err)
+                        return reject(err)
                     db.close();
                     return resolve(flows)
                 });
@@ -219,6 +220,8 @@ var storage={
     saveFlows: function(flows) {
         return when.promise(function(resolve,reject){
             MongoClient.connect(url,function(err,db){
+                if(err)
+                    return reject(err)
                 dbflows=db.collection("Flows")
                 flows.forEach(function(e,i,a){
                     dbflows.updateOne({id: e.id}, e, {upsert:true, w: 1}, function(err, result) {
@@ -412,21 +415,27 @@ var findFlows = function(db, callback) {
     dbflows.find({}).toArray(function(err, flows) {
         if(err){
             console.log(err)
+            callback(err)
         }
         projects.find({}).toArray(function(err, projects) {
-            projects.forEach(function(e,i,a){
-                var exist=flows.filter(function(el){
-                    return el.id==e._id.toJSON()
-                })
-                if(exist.length===0)
-                    flows.push({
-                        id:e._id.toJSON(),
-                        label:e.description,
-                        type:"project",
-                        flows:[]
+            if(err){
+                callback(err)
+            }else{
+                projects.forEach(function(e,i,a){
+                    var exist=flows.filter(function(el){
+                        return el.id==e._id.toJSON()
                     })
-            })
-            callback(flows);
+                    if(exist.length===0)
+                        flows.push({
+                            id:e._id.toJSON(),
+                            label:e.description,
+                            type:"project",
+                            flows:[]
+                        })
+                })
+                callback(null,flows);
+            }
+
         });
     });
 }
