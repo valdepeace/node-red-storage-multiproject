@@ -217,24 +217,41 @@ var storage={
         });
     },
 
-    saveFlows: function(flows) {
+    saveFlows: function(newflows) {
         return when.promise(function(resolve,reject){
             MongoClient.connect(url,function(err,db){
-                if(err)
-                    return reject(err)
-                dbflows=db.collection("Flows")
-                flows.forEach(function(e,i,a){
-                    dbflows.updateOne({id: e.id}, e, {upsert:true, w: 1}, function(err, result) {
-                        if(err)
-                            return reject(err)
-                        return resolve(result)
+                var dbflows=db.collection("Flows")
+                findFlows(db,function(oldflows){
+                    //delete
+                    oldflows.forEach(function(e,i,a){
+                        var exist=newflows.filter(function(el){
+                            return e.id===el.id
+                        })
+                        if(exist.length===0){
+                            console.log("")
+                            dbflows.deleteOne({"_id":e._id},function(err,count){
+                                if(err)
+                                    return reject(err)
+                            })
+                        }
+
                     })
+                    //insert or update
+                    newflows.forEach(function(e,i,a){
+                        e._id=ObjectID(e._id)
+                        dbflows.updateOne({id: e.id}, e, {upsert:true, w: 1}, function(err, result) {
+                            if(err)
+                                return reject(err)
+                        })
+                    })
+                    return resolve()
+                    db.close()
                 })
-                db.close()
+
             })
         })
-
     },
+
 
     getCredentials: function() {
         return when.promise(function(resolve) {
