@@ -25,7 +25,7 @@ var nodeFn = require('when/node/function');
 var keys = require('when/keys');
 var fspath = require("path");
 var mkdirp = fs.mkdirs;
-
+ObjectId = require('mongodb').ObjectId
 //var log = require("../log");
 
 var promiseDir = nodeFn.lift(mkdirp);
@@ -135,7 +135,7 @@ var storage={
             if(settings.mongodbMultiproject.user){
                 url+=settings.mongodbMultiproject.user
                 url+=":"
-                url+=settings.mongodbMultiproject.user
+                url+=settings.mongodbMultiproject.password
                 url+="@"
             }
             url+=settings.mongodbMultiproject.host || "localhost"
@@ -190,10 +190,10 @@ var storage={
 
         oldCredentialsFile = fspath.join(settings.userDir,"credentials.json");
 
-        flowsFileBackup = fspath.join(ffDir,"."+ffName+".backup");
+        //flowsFileBackup = fspath.join(ffDir,"."+ffName+".backup");
 
         sessionsFile = fspath.join(settings.userDir,".sessions.json");
-        projectFile = fspath.join(settings.userDir,"projects.json");
+        //projectFile = fspath.join(settings.userDir,"projects.json");
 
         libDir = fspath.join(settings.userDir,"lib");
         libFlowsDir = fspath.join(libDir,"flows");
@@ -235,22 +235,23 @@ var storage={
                 var dbflows=db.collection("Flows")
                 findFlows(db,function(oldflows){
                     //delete
-                    oldflows.forEach(function(e,i,a){
-                        var exist=newflows.filter(function(el){
-                            return e.id===el.id
-                        })
-                        if(exist.length===0){
-                            console.log("")
-                            dbflows.deleteOne({"_id":e._id},function(err,count){
-                                if(err)
-                                    return reject(err)
+                    if(oldflows)
+                        oldflows.forEach(function(e,i,a){
+                            var exist=newflows.filter(function(el){
+                                return e.id===el.id
                             })
-                        }
+                            if(exist.length===0){
+                                console.log("")
+                                dbflows.deleteOne({"_id":e._id},function(err,count){
+                                    if(err)
+                                        return reject(err)
+                                })
+                            }
 
-                    })
+                        })
                     //insert or update
                     newflows.forEach(function(e,i,a){
-                        e._id=ObjectID(e._id)
+                        //e._id=ObjectId(e._id)
                         dbflows.updateOne({id: e.id}, e, {upsert:true, w: 1}, function(err, result) {
                             if(err)
                                 return reject(err)
@@ -267,19 +268,25 @@ var storage={
 
     getCredentials: function() {
         return when.promise(function(resolve) {
-            fs.readFile(credentialsFile,'utf8',function(err,data) {
-                if (!err) {
-                    resolve(JSON.parse(data));
-                } else {
-                    fs.readFile(oldCredentialsFile,'utf8',function(err,data) {
-                        if (!err) {
-                            resolve(JSON.parse(data));
-                        } else {
-                            resolve({});
+            MongoClient.connect(url, function(err, db) {
+                var dbCredentials=db.collection('Credentials')
+
+                dbCredentials.find({}).toArray(function(err,credentials){
+                    if(err){
+                        reject(err)
+                    }else{
+                        if(credentials.length!=0){
+                            resolve(credentials.reduce(function(obj,act,i){
+                                obj[act.node_id]=act.credentials
+                                return obj
+                            },{}))
+                        }else{
+                            resolve({})
                         }
-                    });
-                }
+                    }
+                })
             });
+
         });
     },
 
@@ -287,18 +294,26 @@ var storage={
         if (settings.readOnly) {
             return when.resolve();
         }
+        return when.promise(function(resolve,reject) {
+            MongoClient.connect(url, function (err, db) {
+                var dbCredentials = db.collection('Credentials')
+                for (var key in credentials) {
+                    var obj_cred = {
+                        node_id: key,
+                        credentials: credentials[key]
+                    }
+                    dbCredentials.updateOne({node_id: key}, obj_cred, {
+                        upsert: true,
+                        w: 1
+                    }, function (err, result) {
+                        if (err)
+                            return reject(err)
+                    })
+                }
+                return resolve()
+            });
+        })
 
-        try {
-            fs.renameSync(credentialsFile,credentialsFileBackup);
-        } catch(err) {
-        }
-        var credentialData;
-        if (settings.flowFilePretty) {
-            credentialData = JSON.stringify(credentials,null,4);
-        } else {
-            credentialData = JSON.stringify(credentials);
-        }
-        return writeFile(credentialsFile, credentialData);
     },
 
     getSettings: function() {
@@ -352,23 +367,56 @@ var storage={
 
     getSessions: function() {
         return when.promise(function(resolve,reject) {
-            fs.readFile(sessionsFile,'utf8',function(err,data){
-                if (!err) {
-                    try {
-                        return resolve(JSON.parse(data));
-                    } catch(err2) {
-                        //log.trace("Corrupted sessions file - resetting");
+            MongoClient.connect(url, function(err, db) {
+                var dbSessions=db.collection('Sessions')
+
+                dbSessions.find({}).toArray(function(err,sessions){
+                    if(err){
+                        reject(err)
+                    }else{
+                        if(sessions.length!=0){
+                            resolve(sessions.reduce(function(obj,act,i){
+                                obj[act.accessToken]=act
+                                return obj
+                            },{}))
+                        }else{
+                            resolve({})
+                        }
                     }
-                }
-                resolve({});
-            })
+                })
+            });
+            /*
+             fs.readFile(sessionsFile,'utf8',function(err,data){
+             if (!err) {
+             try {
+             return resolve(JSON.parse(data));
+             } catch(err2) {
+             //log.trace("Corrupted sessions file - resetting");
+             }
+             }
+             resolve({});
+             })
+             */
         });
     },
     saveSessions: function(sessions) {
         if (settings.readOnly) {
             return when.resolve();
         }
-        return writeFile(sessionsFile,JSON.stringify(sessions));
+        return when.promise(function(resolve,reject){
+            MongoClient.connect(url, function(err, db) {
+                var dbSessions=db.collection('Sessions')
+                for(var obj_session in sessions){
+                    dbSessions.updateOne({user: sessions[obj_session].user}, sessions[obj_session], {upsert:true, w: 1}, function(err, result) {
+                        if(err)
+                            return reject(err)
+                    })
+                }
+                return resolve()
+            });
+        })
+
+        //return writeFile(sessionsFile,JSON.stringify(sessions));
     },
 
     getLibraryEntry: function(type,path) {
