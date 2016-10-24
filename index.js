@@ -505,7 +505,7 @@ var findFlows = function(db, callback) {
                     if(exist.length===0)
                         flows.push({
                             id:e._id.toJSON(),
-                            label:e.description,
+                            name:e.description,
                             type:"project",
                             flows:[]
                         })
