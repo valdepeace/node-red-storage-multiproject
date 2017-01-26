@@ -142,7 +142,7 @@ var storage={
             url+=":"
             url+=settings.mongodbMultiproject.port || "27017"
             url+="/"
-            url+=settings.mongodbMultiproject.bd || "test"
+            url+=settings.mongodbMultiproject.db || "test"
         }
         if (!settings.userDir) {
             try {
