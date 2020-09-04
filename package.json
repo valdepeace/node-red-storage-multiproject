@@ -34,7 +34,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "mongodb": "^2.2.5",
+    "mongodb": "^3.6.1",
     "when": "^3.7.7"
   }
 }
